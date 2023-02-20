@@ -56,6 +56,7 @@ namespace BaldiMapConverter
                 var str = "";
                 var str2 = "";
                 var str3 = "";
+                var str4 = "";
                 for (int i = 0; i < MainObject.transform.childCount; i++)
                 {
                     var obj = MainObject.transform.GetChild(i);
@@ -97,25 +98,46 @@ namespace BaldiMapConverter
                             {
                                 if (room.name.StartsWith("Tile"))
                                 {
-                                    str2 += room.transform.position.x;
-                                    str2 += "$";
-                                    str2 += room.transform.position.y;
-                                    str2 += "$";
-                                    str2 += room.transform.position.z;
-                                    str2 += "$";
-                                    str2 += room.transform.eulerAngles.x;
-                                    str2 += "$";
-                                    str2 += room.transform.eulerAngles.y;
-                                    str2 += "$";
-                                    str2 += room.transform.eulerAngles.z;
-                                    str2 += "$";
-                                    str2 += filter.mesh.name.Replace(" Instance", "");
-                                    str2 += "$";
-                                    // Could've used switch here but decided not to
-                                    if (roomController.category == RoomCategory.Faculty) str2 += "f";
-                                    else if (roomController.category == RoomCategory.Office) str2 += "f";
-                                    else if (roomController.category == RoomCategory.Closet) str2 += "s";
-                                    else str2 += "c";
+                                    if (roomController.category == RoomCategory.Faculty)
+                                    {
+                                        str4 += room.transform.position.x;
+                                        str4 += "$";
+                                        str4 += room.transform.position.y;
+                                        str4 += "$";
+                                        str4 += room.transform.position.z;
+                                        str4 += "$";
+                                        str4 += room.transform.eulerAngles.x;
+                                        str4 += "$";
+                                        str4 += room.transform.eulerAngles.y;
+                                        str4 += "$";
+                                        str4 += room.transform.eulerAngles.z;
+                                        str4 += "$";
+                                        str4 += filter.mesh.name.Replace(" Instance", "");
+                                        str4 += "$";
+                                        str4 += "f";
+                                    }
+                                    else
+                                    {
+                                        str2 += room.transform.position.x;
+                                        str2 += "$";
+                                        str2 += room.transform.position.y;
+                                        str2 += "$";
+                                        str2 += room.transform.position.z;
+                                        str2 += "$";
+                                        str2 += room.transform.eulerAngles.x;
+                                        str2 += "$";
+                                        str2 += room.transform.eulerAngles.y;
+                                        str2 += "$";
+                                        str2 += room.transform.eulerAngles.z;
+                                        str2 += "$";
+                                        str2 += filter.mesh.name.Replace(" Instance", "");
+                                        str2 += "$";
+                                        // Could've used switch here but decided not to
+                                        if (roomController.category == RoomCategory.Faculty) str2 += "f";
+                                        else if (roomController.category == RoomCategory.Office) str2 += "f";
+                                        else if (roomController.category == RoomCategory.Closet) str2 += "s";
+                                        else str2 += "c";
+                                    }
                                     if (iRoom != obj.childCount) str2 += "%";
                                 }
                             }
@@ -252,6 +274,7 @@ namespace BaldiMapConverter
                 File.WriteAllText(Path.Combine(mainPath, "Areas.txt"), str3.ToString());
                 File.WriteAllText(Path.Combine(mainPath, "Halls.txt"), str.ToString());
                 File.WriteAllText(Path.Combine(mainPath, "Rooms.txt"), str2.ToString());
+                File.WriteAllText(Path.Combine(mainPath, "Faculty.txt"), str4.ToString());
             }
         }
     }
