@@ -14,7 +14,6 @@ namespace BaldiMapConverter
     public class Plugin : BaseUnityPlugin
     {
         public static Plugin Instance { get; private set; }
-        public bool Visible = false;
 
         // Objects
         public GameObject MainObject;
@@ -36,25 +35,9 @@ namespace BaldiMapConverter
             Instance = this;
         }
 
-        public void OnGUI()
-        {
-            if (Visible)
-            {
-                if (GUI.Button(new Rect(25, 25, 124, 20), "Generate"))
-                {
-                    GenerateData();
-                }
-            }
-        }
-
         public void Update()
         {
-            if (Input.GetKeyUp(KeyCode.F6))
-            {
-                Visible = !Visible;
-                Cursor.lockState = Visible ? CursorLockMode.None : (SceneManager.GetActiveScene().name.ToLower() == "game" ? CursorLockMode.Locked : CursorLockMode.None);
-                Cursor.visible = Visible;
-            }
+            if (Input.GetKeyUp(KeyCode.F6)) GenerateData();
         }
 
         public void GenerateData()
