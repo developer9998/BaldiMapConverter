@@ -1,6 +1,8 @@
 ﻿using BepInEx;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using UnityEngine;
@@ -13,8 +15,21 @@ namespace BaldiMapConverter
     {
         public static Plugin Instance { get; private set; }
         public bool Visible = false;
+
+        // Objects
         public GameObject MainObject;
         public GameObject HallObject;
+
+        public Dictionary<RoomCategory, string[]> RoomCategories = new Dictionary<RoomCategory, string[]>()
+        {
+            { RoomCategory.Class,     new string[2] { "c", "Class"         } },
+            { RoomCategory.Faculty,   new string[2] { "f", "Faculty"       } },
+            { RoomCategory.Office,    new string[2] { "f", "Office"        } },
+            { RoomCategory.FieldTrip, new string[2] { "o", "FieldTripExit" } },
+            { RoomCategory.Closet,    new string[2] { "s", "Closet"        } },
+            { RoomCategory.Mystery,   new string[2] { "m", "MysteryRoom"   } },
+            { RoomCategory.Test,      new string[2] { "m", "MysteryRoom"   } }
+        };
 
         public void Awake()
         {
@@ -52,16 +67,19 @@ namespace BaldiMapConverter
                 if (filteredObjects.Length != 1) return;
 
                 MainObject = filteredObjects[0].gameObject;
+                var roomCount = 0;
 
-                var str = "";
-                var str2 = "";
-                var str3 = "";
-                var str4 = "";
+                // Initial data collection
+                var currentTime = DateTime.Now.ToString().Replace("/", ".").Replace(":", ".");
+                var mainPath = Path.Combine(Path.GetDirectoryName(typeof(Plugin).Assembly.Location), "Data", currentTime);
+                Directory.CreateDirectory(mainPath);
+
                 for (int i = 0; i < MainObject.transform.childCount; i++)
                 {
                     var obj = MainObject.transform.GetChild(i);
                     if (obj.name.StartsWith("HallController("))
                     {
+                        var str = "";
                         for (int iRoom = 0; iRoom < obj.childCount; iRoom++)
                         {
                             var room = obj.GetChild(iRoom);
@@ -88,63 +106,45 @@ namespace BaldiMapConverter
                                 }
                             }
                         }
+                        File.WriteAllText(Path.Combine(mainPath, "Halls.txt"), str);
                     }
                     else if (obj.name.StartsWith("RoomController("))
                     {
+                        roomCount++;
+                        var str = "";
+                        var cat = RoomCategory.Null;
                         for (int iRoom = 0; iRoom < obj.childCount; iRoom++)
                         {
                             var room = obj.GetChild(iRoom);
                             if (room.TryGetComponent(out MeshFilter filter) && obj.TryGetComponent(out RoomController roomController))
                             {
+                                cat = roomController.category;
                                 if (room.name.StartsWith("Tile"))
                                 {
-                                    if (roomController.category == RoomCategory.Faculty)
-                                    {
-                                        str4 += room.transform.position.x;
-                                        str4 += "$";
-                                        str4 += room.transform.position.y;
-                                        str4 += "$";
-                                        str4 += room.transform.position.z;
-                                        str4 += "$";
-                                        str4 += room.transform.eulerAngles.x;
-                                        str4 += "$";
-                                        str4 += room.transform.eulerAngles.y;
-                                        str4 += "$";
-                                        str4 += room.transform.eulerAngles.z;
-                                        str4 += "$";
-                                        str4 += filter.mesh.name.Replace(" Instance", "");
-                                        str4 += "$";
-                                        str4 += "f";
-                                    }
-                                    else
-                                    {
-                                        str2 += room.transform.position.x;
-                                        str2 += "$";
-                                        str2 += room.transform.position.y;
-                                        str2 += "$";
-                                        str2 += room.transform.position.z;
-                                        str2 += "$";
-                                        str2 += room.transform.eulerAngles.x;
-                                        str2 += "$";
-                                        str2 += room.transform.eulerAngles.y;
-                                        str2 += "$";
-                                        str2 += room.transform.eulerAngles.z;
-                                        str2 += "$";
-                                        str2 += filter.mesh.name.Replace(" Instance", "");
-                                        str2 += "$";
-                                        // Could've used switch here but decided not to
-                                        if (roomController.category == RoomCategory.Faculty) str2 += "f";
-                                        else if (roomController.category == RoomCategory.Office) str2 += "f";
-                                        else if (roomController.category == RoomCategory.Closet) str2 += "s";
-                                        else str2 += "c";
-                                    }
-                                    if (iRoom != obj.childCount) str2 += "%";
+                                    str += room.transform.position.x;
+                                    str += "$";
+                                    str += room.transform.position.y;
+                                    str += "$";
+                                    str += room.transform.position.z;
+                                    str += "$";
+                                    str += room.transform.eulerAngles.x;
+                                    str += "$";
+                                    str += room.transform.eulerAngles.y;
+                                    str += "$";
+                                    str += room.transform.eulerAngles.z;
+                                    str += "$";
+                                    str += filter.mesh.name.Replace(" Instance", "");
+                                    str += "$";
+                                    str += RoomCategories[roomController.category][0];
+                                    if (iRoom != obj.childCount) str += "%";
                                 }
                             }
                         }
+                        File.WriteAllText(Path.Combine(mainPath, $"Room{roomCount}_{RoomCategories[cat][1]}.txt"), str);
                     }
                     else if (obj.name.StartsWith("Playground("))
                     {
+                        var str = "";
                         for (int iRoom = 0; iRoom < obj.childCount; iRoom++)
                         {
                             var room = obj.GetChild(iRoom);
@@ -152,28 +152,30 @@ namespace BaldiMapConverter
                             {
                                 if (room.name.StartsWith("Tile"))
                                 {
-                                    str3 += room.transform.position.x;
-                                    str3 += "$";
-                                    str3 += room.transform.position.y;
-                                    str3 += "$";
-                                    str3 += room.transform.position.z;
-                                    str3 += "$";
-                                    str3 += room.transform.eulerAngles.x;
-                                    str3 += "$";
-                                    str3 += room.transform.eulerAngles.y;
-                                    str3 += "$";
-                                    str3 += room.transform.eulerAngles.z;
-                                    str3 += "$";
-                                    str3 += filter.mesh.name.Replace(" Instance", "");
-                                    str3 += "$";
-                                    str3 += "o";
-                                    if (iRoom != obj.childCount) str3 += "%";
+                                    str += room.transform.position.x;
+                                    str += "$";
+                                    str += room.transform.position.y;
+                                    str += "$";
+                                    str += room.transform.position.z;
+                                    str += "$";
+                                    str += room.transform.eulerAngles.x;
+                                    str += "$";
+                                    str += room.transform.eulerAngles.y;
+                                    str += "$";
+                                    str += room.transform.eulerAngles.z;
+                                    str += "$";
+                                    str += filter.mesh.name.Replace(" Instance", "");
+                                    str += "$";
+                                    str += "o";
+                                    if (iRoom != obj.childCount) str += "%";
                                 }
                             }
                         }
+                        File.WriteAllText(Path.Combine(mainPath, $"Playground.txt"), str);
                     }
                     else if (obj.name.StartsWith("Cafeteria("))
                     {
+                        var str3 = "";
                         for (int iRoom = 0; iRoom < obj.childCount; iRoom++)
                         {
                             var room = obj.GetChild(iRoom);
@@ -200,9 +202,11 @@ namespace BaldiMapConverter
                                 }
                             }
                         }
+                        File.WriteAllText(Path.Combine(mainPath, $"Cafeteria.txt"), str3);
                     }
                     else if (obj.name.StartsWith("Library("))
                     {
+                        var str3 = "";
                         for (int iRoom = 0; iRoom < obj.childCount; iRoom++)
                         {
                             var room = obj.GetChild(iRoom);
@@ -229,11 +233,13 @@ namespace BaldiMapConverter
                                 }
                             }
                         }
+                        File.WriteAllText(Path.Combine(mainPath, $"Library.txt"), str3);
                     }
                     else if (obj.name.StartsWith("FieldTripEntrance"))
                     {
                         if (obj.Find("RoomController") != null)
                         {
+                            var str3 = "";
                             var mainRoom = obj.Find("RoomController");
                             for (int iRoom = 0; iRoom < mainRoom.childCount; iRoom++)
                             {
@@ -261,20 +267,12 @@ namespace BaldiMapConverter
                                     }
                                 }
                             }
+                            File.WriteAllText(Path.Combine(mainPath, $"FieldTripEntrance.txt"), str3);
                         }
                     }
                 }
 
-                // Initial data collection
-                var currentTime = DateTime.Now.ToString().Replace("/", ".").Replace(":", ".");
-                var mainPath = Path.Combine(Path.GetDirectoryName(typeof(Plugin).Assembly.Location), "Data", currentTime);
-                Directory.CreateDirectory(mainPath);
-
-                // Save data collection
-                File.WriteAllText(Path.Combine(mainPath, "Areas.txt"), str3.ToString());
-                File.WriteAllText(Path.Combine(mainPath, "Halls.txt"), str.ToString());
-                File.WriteAllText(Path.Combine(mainPath, "Rooms.txt"), str2.ToString());
-                File.WriteAllText(Path.Combine(mainPath, "Faculty.txt"), str4.ToString());
+                Process.Start("explorer.exe", @mainPath);
             }
         }
     }
