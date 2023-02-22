@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using HarmonyLib;
 
 namespace BaldiMapConverter
 {
@@ -22,11 +23,14 @@ namespace BaldiMapConverter
         {
             { RoomCategory.Class,     new string[2] { "c", "Class"         } },
             { RoomCategory.Faculty,   new string[2] { "f", "Faculty"       } },
-            { RoomCategory.Office,    new string[2] { "f", "Office"        } },
+            { RoomCategory.Office,    new string[2] { "d", "Office"        } },
             { RoomCategory.FieldTrip, new string[2] { "o", "FieldTripExit" } },
             { RoomCategory.Closet,    new string[2] { "s", "Closet"        } },
             { RoomCategory.Mystery,   new string[2] { "m", "MysteryRoom"   } },
-            { RoomCategory.Test,      new string[2] { "m", "MysteryRoom"   } }
+            { RoomCategory.Test,      new string[2] { "m", "MysteryRoom"   } },
+            { RoomCategory.Hall,      new string[2] { "h", "Halls"         } },
+            { RoomCategory.Buffer,    new string[2] { "b", "Buffer"        } },
+            { RoomCategory.Null,      new string[2] { "u", "Unknown"       } }
         };
 
         public void Awake()
@@ -44,21 +48,20 @@ namespace BaldiMapConverter
             var scene = SceneManager.GetActiveScene();
             if (scene.name.ToLower() == "game")
             {
-                var objects = FindObjectsOfType<EnvironmentController>();
-                var filteredObjects = objects.Where(a => a.name.Contains("Main")).ToArray();
-                if (filteredObjects.Length != 1) return;
-
-                MainObject = filteredObjects[0].gameObject;
+                MainObject = FindObjectOfType<EnvironmentController>().gameObject;  
                 var roomCount = 0;
                 var strs = new List<string>();
 
                 // Initial data collection
                 var currentTime = DateTime.Now.ToString().Replace("/", ".").Replace(":", ".");
-                var mainPath = Path.Combine(Path.GetDirectoryName(typeof(Plugin).Assembly.Location), "Data", currentTime);
+                var roomSeed = Singleton<CoreGameManager>.Instance.Seed().ToString();
+                var floor = Singleton<CoreGameManager>.Instance.sceneObject.levelTitle;
+                var mainPath = Path.Combine(Path.GetDirectoryName(typeof(Plugin).Assembly.Location), "Data", currentTime + $" ({floor}, {roomSeed})");
                 Directory.CreateDirectory(mainPath);
 
                 var str_Door = "";
-                foreach(var door in MainObject.transform.GetComponentsInChildren<StandardDoor>())
+                var stDoors = FindObjectsOfType<StandardDoor>();
+                foreach(var door in stDoors)
                 {
                     if (door.transform.GetComponentInParent<RoomController>() != null)
                     {
@@ -72,15 +75,61 @@ namespace BaldiMapConverter
                         str_Door += "$";
                         str_Door += "st"; // st for Standard, sw for Swing
                         str_Door += "$";
-                        str_Door += RoomCategories[door.transform.GetComponentInParent<RoomController>().category][0];
+                        var r = door.transform.GetComponentInParent<RoomController>();
+                        var ctt_ = RoomCategory.Null;
+                        if (r.connectedRooms.Count == 1) ctt_ = r.category;
+                        else if (r.connectedRooms.Where(a => a.category != RoomCategory.Test).ToList().Count == 1) ctt_ = r.category;
+                        else ctt_ = (r.connectedRooms.Where(a => a == r).ToList()[0] != null ? r.connectedRooms.Where(a => a == r).ToList()[0].category : r.category);
+                        str_Door += RoomCategories[ctt_][0];
                         str_Door += "$";
                         var crt = door.transform.GetComponentInParent<RoomController>();
                         if (crt.connectedRooms.Count == 0 || door.bTile.transform.GetComponentInParent<RoomController>().category == RoomCategory.Hall || door.bTile.transform.GetComponentInParent<RoomController>().category == RoomCategory.Test) str_Door += "0";
-                        else str_Door += crt.connectedRooms.Where(a => a != crt).ToList().Where(a => a.category != RoomCategory.Test).ToArray().Length;
+                        else str_Door += crt.connectedRooms.Where(a => a != crt).ToList().Where(a => a.category != RoomCategory.Test && a.category != crt.category).ToArray().Length;
                         str_Door += "%";
                     }
                 }
                 strs.Add(str_Door);
+
+                str_Door = "";
+                var stDoors2 = FindObjectsOfType<SwingDoor>();
+                foreach (var door in stDoors2)
+                {
+                    if (door.transform.GetComponentInParent<RoomController>() != null)
+                    {
+                        str_Door += door.transform.GetChild(0).position.x;
+                        str_Door += "$";
+                        str_Door += door.transform.GetChild(0).position.y;
+                        str_Door += "$";
+                        str_Door += door.transform.GetChild(0).position.z;
+                        str_Door += "$";
+                        str_Door += door.transform.rotation.eulerAngles.y;
+                        str_Door += "$";
+                        str_Door += "sw"; // st for Standard, sw for Swing
+                        str_Door += "$";
+                        str_Door += RoomCategories[door.transform.GetComponentInParent<RoomController>().category][0];
+                        str_Door += "$";
+                        str_Door += "0";
+                        str_Door += "%";
+                    }
+                }
+                strs.Add(str_Door);
+                var sTiles__ = FindObjectOfType<EnvironmentController>().npcSpawnTile;
+                var points = "";
+                for (int i_ = 0; i_ < sTiles__.Length; i_++)
+                {
+                    var npc__ = FindObjectOfType<EnvironmentController>().npcsToSpawn[i_];
+                    var t__ = sTiles__[i_];
+
+                    points += t__.transform.position.x;
+                    points += "$";
+                    points += t__.transform.position.y + 5;
+                    points += "$";
+                    points += t__.transform.position.z;
+                    points += "$";
+                    points += npc__.gameObject.name.ToLower();
+                    points += "%";
+                }
+                strs.Add(points);
                 //File.WriteAllText(Path.Combine(mainPath, "StardardDoors.txt"), str_Door);
 
                 for (int i = 0; i < MainObject.transform.childCount; i++)
@@ -122,10 +171,114 @@ namespace BaldiMapConverter
                         roomCount++;
                         var str = "";
                         var cat = RoomCategory.Null;
+                        var oee = obj.transform.GetComponentsInChildren<Transform>().Where(a => a.name == "Object").ToArray();
 
-                        if (obj.transform.Find("Object"))
+                        if (obj.transform.GetComponentInChildren<FacultyBuilderBasic>() != null)
                         {
-                            var o = obj.transform.Find("Object");
+                            var c___ = obj.transform.GetComponentInChildren<FacultyBuilderBasic>();
+                            for (int eye = 0; eye < c___.transform.childCount; eye++)
+                            {
+                                var eyye = c___.transform.GetChild(eye);
+                                if (eyye.name.StartsWith("RoundTable_Chairs"))
+                                {
+                                    if (eyye.name.Contains("1"))
+                                    {
+                                        str += eyye.transform.position.x;
+                                        str += "$";
+                                        str += eyye.transform.position.y;
+                                        str += "$";
+                                        str += eyye.transform.position.z;
+                                        str += "$";
+                                        str += eyye.transform.eulerAngles.y;
+                                        str += "$";
+                                        str += "rt1";
+                                        str += "%";
+                                    }
+                                    else
+                                    {
+                                        str += eyye.transform.position.x;
+                                        str += "$";
+                                        str += eyye.transform.position.y;
+                                        str += "$";
+                                        str += eyye.transform.position.z;
+                                        str += "$";
+                                        str += eyye.transform.eulerAngles.y;
+                                        str += "$";
+                                        str += "rt2";
+                                        str += "%";
+                                    }
+                                }
+                                if (eyye.name.StartsWith("BigDes"))
+                                {
+                                    str += eyye.transform.position.x;
+                                    str += "$";
+                                    str += eyye.transform.position.y;
+                                    str += "$";
+                                    str += eyye.transform.position.z;
+                                    str += "$";
+                                    str += eyye.transform.eulerAngles.y;
+                                    str += "$";
+                                    str += "td";
+                                    str += "%";
+                                }
+                                if (eyye.name.StartsWith("CafeteriaTable"))
+                                {
+                                    str += eyye.transform.position.x;
+                                    str += "$";
+                                    str += eyye.transform.position.y;
+                                    str += "$";
+                                    str += eyye.transform.position.z;
+                                    str += "$";
+                                    str += eyye.transform.eulerAngles.y;
+                                    str += "$";
+                                    str += "ct";
+                                    str += "%";
+                                }
+                            }
+                        }
+                        if (obj.transform.GetComponentInChildren<OfficeBuilderStandard>() != null)
+                        {
+                            var c___ = obj.transform.GetComponentInChildren<OfficeBuilderStandard>();
+                            for (int eye = 0; eye < c___.transform.childCount; eye++)
+                            {
+                                var eyye = c___.transform.GetChild(eye);
+                                if (eyye.name.StartsWith("BigDes"))
+                                {
+                                    str += eyye.transform.position.x;
+                                    str += "$";
+                                    str += eyye.transform.position.y;
+                                    str += "$";
+                                    str += eyye.transform.position.z;
+                                    str += "$";
+                                    str += eyye.transform.eulerAngles.y;
+                                    str += "$";
+                                    str += "td";
+                                    str += "%";
+                                }
+                            }
+
+                            for (int eye = 0; eye < obj.transform.childCount; eye++)
+                            {
+                                var eyye = obj.transform.GetChild(eye);
+                                if (eyye.name.StartsWith("BigDes")) // The desk with the tape is sometimes parented of the actual room and not the builder
+                                {
+                                    str += eyye.transform.position.x;
+                                    str += "$";
+                                    str += eyye.transform.position.y;
+                                    str += "$";
+                                    str += eyye.transform.position.z;
+                                    str += "$";
+                                    str += eyye.transform.eulerAngles.y;
+                                    str += "$";
+                                    str += "td";
+                                    str += "%";
+                                }
+                            }
+                        }
+
+                        foreach (var iee in oee)
+                        {
+                            var o = iee;
                             for (int eye = 0; eye < o.childCount; eye++)
                             {
                                 var eyye = o.GetChild(eye);
@@ -168,10 +321,36 @@ namespace BaldiMapConverter
                                     str += "td";
                                     str += "%";
                                 }
+                                if (eyye.name.StartsWith("MathMachin"))
+                                {
+                                    str += eyye.transform.position.x;
+                                    str += "$";
+                                    str += eyye.transform.position.y;
+                                    str += "$";
+                                    str += eyye.transform.position.z;
+                                    str += "$";
+                                    str += eyye.transform.eulerAngles.y;
+                                    str += "$";
+                                    str += "mm";
+                                    str += "%";
+                                }
+                                if (eyye.name.StartsWith("Chairs_Desk_P"))
+                                {
+                                    str += eyye.transform.position.x;
+                                    str += "$";
+                                    str += eyye.transform.position.y;
+                                    str += "$";
+                                    str += eyye.transform.position.z;
+                                    str += "$";
+                                    str += eyye.transform.eulerAngles.y;
+                                    str += "$";
+                                    str += "btc";
+                                    str += "%";
+                                }
                             }
                         }
 
-
+   
                         for (int iRoom = 0; iRoom < obj.childCount; iRoom++)
                         {
                             var room = obj.GetChild(iRoom);
@@ -277,8 +456,7 @@ namespace BaldiMapConverter
 
                             }
                         }
-                        strs.Add(str3);
-                        strs.Add(str4);
+                        strs.Add(str3 + str4); // They were two different files but whatever
                     }
                     else if (obj.name.StartsWith("Library("))
                     {
